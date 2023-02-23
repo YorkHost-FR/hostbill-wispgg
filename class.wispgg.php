@@ -5,12 +5,11 @@
  *
  * Hosting/Provisioning module
  *
- * @see New DOCS https://dashflo.net/docs/api/pterodactyl/v1/
- * @see OLD DOCS http://web.archive.org/web/20190224221004/https://deploys.io/docs/api/pterodactyl/v1/
+ * @see DOCS TODO: Once Wisp decides they want to release a **DOCUMENTED** software, fill it in. (Probably never)
  *
  *
  * @see  http://dev.hostbillapp.com/dev-kit/provisioning-modules/
- * @author HostBill <cs@hostbillapp.com>
+ * @author Xephia.eu
  *
  */
 class wispgg extends HostingModule {
@@ -27,7 +26,7 @@ class wispgg extends HostingModule {
      * new functions in this class!
      * @var string
      */
-    protected $version = '1.2022-13-5';
+    protected $version = '1.2023-23-02';
 
     /**
      * Module name, visible in admin portal.

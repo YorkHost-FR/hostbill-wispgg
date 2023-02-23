@@ -4,7 +4,7 @@
  * Class wispgg_controller
  * Admin controller
  * @see https://dev.hostbillapp.com/dev-kit/advanced-topics/hostbill-controllers/
- * @author HostBill <cs@hostbillapp.com>
+ * @author Xephia.eu
  */
 class wispgg_controller extends HBController
 {
