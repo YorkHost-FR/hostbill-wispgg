@@ -389,7 +389,6 @@ class wispgg extends HostingModule {
             if (isset($response['errors'])) {
                 foreach ($response['errors'] as $error) {
                     $this->addError($error['code'] . ' details: ' . $error['detail']);
-                    $this->postToDiscord($post);
                     return false;
                 }
             } else {
@@ -541,9 +540,7 @@ class wispgg extends HostingModule {
             $q->closeCursor();
             if (!$ret) {
                 $user_id = $user['attributes']['id'];
-                $this->postToDiscord("1");
             } else {
-                $this->postToDiscord("2");
                 $q = $this->db->prepare("UPDATE hb_accounts SET username = :username, password = :pass WHERE id = :id");
                 $q->execute(array(
                     ':username' => $ret['username'],
