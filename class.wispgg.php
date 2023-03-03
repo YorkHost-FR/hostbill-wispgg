@@ -576,6 +576,8 @@ class wispgg extends HostingModule {
                     case "czech":
                         $wisp_language = "cs_CZ";
                         break;
+                    default:
+                        $wisp_language = "en";
                 }
 
                 $userResult = $this->api('users', 'POST', [
