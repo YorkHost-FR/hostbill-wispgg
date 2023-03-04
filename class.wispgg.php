@@ -465,7 +465,7 @@ class wispgg extends HostingModule {
         }
         $data['start_on_completion'] = true;
 
-        $data = $this->parseVariables($variables, $nodeAndAllocations, $variables);
+        $data = $this->parseVariables($variables, $nodeAndAllocations, $data);
 
         $server = $this->api('servers', 'POST', $data);
         if (is_array($server)) {
