@@ -388,7 +388,10 @@ class wispgg extends HostingModule {
         } else {
             if (isset($response['errors'])) {
                 foreach ($response['errors'] as $error) {
-                    $this->addError($error['code'] . ' details: ' . $error['detail']);
+                    $this->addError($error['code'] . ' detailss: ' . $error['detail']);
+                    $this->addError('Endpoint: ' . $endpoint);
+                    $this->addError('Method: ' . $method);
+                    $this->addError('Data: ' . $post);
                     return false;
                 }
             } else {
@@ -414,6 +417,7 @@ class wispgg extends HostingModule {
         $mult_backups = 1000;
 
         $data = [];
+        $data['oom_disabled'] = false;
         $data['owner_id'] = $user;
         $data['external_id'] = $this->account_details["id"];
         $data['name'] = $this->details['domain']['value'];
