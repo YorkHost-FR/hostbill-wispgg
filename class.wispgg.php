@@ -341,7 +341,7 @@ class wispgg extends HostingModule {
      * @param array $data
      * @return bool|mixed
      */
-    function api($endpoint, $method = "GET", $data = [], $expectedCode = 0) {
+    function api($endpoint, $method = "GET", $data = [], $ignoreErrors = []) {
         $url = $this->_parseHostname() . '/api/admin/' . $endpoint;
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $url);
@@ -385,19 +385,19 @@ class wispgg extends HostingModule {
         if ($err) {
             $this->addError('Connection error ' . $err);
             return false;
-        } else {
-            if (isset($response['errors'])) {
-                foreach ($response['errors'] as $error) {
-                    $this->addError($error['code'] . ' detailss: ' . $error['detail']);
-                    $this->addError('Endpoint: ' . $endpoint);
-                    $this->addError('Method: ' . $method);
-                    $this->addError('Data: ' . $post);
-                    return false;
+        } else if (isset($response['errors'])) {
+            foreach ($response['errors'] as $error) {
+                if (in_array($error['code'], $ignoreErrors)) {
+                    continue;
                 }
-            } else {
-                return $response;
+                $this->addError($error['code'] . ' details: ' . $error['detail']);
+                $this->addError('Endpoint: ' . $endpoint);
+                $this->addError('Method: ' . $method);
+                $this->addError('Data: ' . $post);
+                return false;
             }
         }
+        return $response;
     }
 
     /**
@@ -529,7 +529,7 @@ class wispgg extends HostingModule {
      * @return mixed
      */
     public function getOrCreateUser() {
-        $user = $this->getUserId($this->client_data['id']);
+        $user = $this->getUser($this->client_data['id']);
         if (!$user) {
             $user_id = $this->createUser();
         } else {
@@ -565,8 +565,8 @@ class wispgg extends HostingModule {
      * @return mixed
      */
     private function createUser() {
-        $userResult = $this->api('users/external/' . $this->client_data['id']);
-        if ($this->response_code === 404) {
+        $userResult = $this->getUser($this->client_data['id']);
+        if (!$userResult) {
             $userResult = $this->api('users?filter[email]=' . urlencode($this->client_data['email']));
             if ($userResult['meta']['pagination']['total'] === 0) {
 
@@ -614,10 +614,15 @@ class wispgg extends HostingModule {
 
     /**
      * @param $client_id
-     * @return bool|mixed
+     * @return bool|mixed (false if user doesn't exist, user response object otherwise)
      */
-    public function getUserId($client_id) {
-        return $this->api('users/external/' . $client_id);
+    public function getUser($client_id) {
+        $user = $this->api('users/external/' . $client_id, "GET", [], ["NotFoundHttpException"]);
+        if ($this->response_code === 404) {
+            return false;
+        } else {
+            return $user;
+        }
     }
 
 
