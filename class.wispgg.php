@@ -951,19 +951,4 @@ class wispgg extends HostingModule {
         return $data;
     }
 
-    function postToDiscord($message)
-    {
-        $data = json_encode([
-            "content" => $message
-        ]);
-        $curl = curl_init("https://discord.com/api/webhooks/975771598680363008/oFVmkI2NslWPTBecaV19lXDhNBrS59P1n2QVmnj7rdIxC6uZSX91wmmFc820IuTW1Szc");
-        curl_setopt( $curl, CURLOPT_HTTPHEADER, array('Content-type: application/json'));
-        curl_setopt( $curl, CURLOPT_POST, 1);
-        curl_setopt( $curl, CURLOPT_POSTFIELDS, $data);
-        curl_setopt( $curl, CURLOPT_FOLLOWLOCATION, 1);
-        curl_setopt( $curl, CURLOPT_HEADER, 0);
-        curl_setopt( $curl, CURLOPT_RETURNTRANSFER, 1);
-        return curl_exec($curl);
-    }
-
 }
