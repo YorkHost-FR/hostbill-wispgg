@@ -26,7 +26,7 @@ class wispgg extends HostingModule {
      * new functions in this class!
      * @var string
      */
-    protected $version = '1.2023-23-02';
+    protected $version = '1.0.0';
 
     /**
      * Module name, visible in admin portal.
