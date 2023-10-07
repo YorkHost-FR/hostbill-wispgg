@@ -1,0 +1,7 @@
+include:
+  - project: "xephia/cicd"
+    file: "/discord/.gitlab-ci.yml"
+
+variables:
+  WEBHOOK_URL: $WEBHOOK_URL
+  PROJECT_NAME: HostBill - Wisp.gg
