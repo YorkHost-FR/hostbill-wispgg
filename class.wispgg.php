@@ -363,7 +363,7 @@ class wispgg extends HostingModule {
         }
         curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
 
-        HBDebug::debug('HB ==> Wisp', [
+        $this->logger()->debug('HB ==> Wisp', [
             'headers' => $headers,
             'request body' => $post,
             'url' => $url,
@@ -375,7 +375,7 @@ class wispgg extends HostingModule {
         $err = curl_error($curl);
         curl_close($curl);
 
-        HBDebug::debug('HB <== Wisp', [
+        $this->logger()->debug('HB <== Wisp', [
             'result' => $result,
             'response body' => $response,
             'code' => $code,

@@ -4,4 +4,22 @@ include:
 
 variables:
   WEBHOOK_URL: $WEBHOOK_URL
-  PROJECT_NAME: HostBill - Wisp.gg
+  PROJECT_NAME: HostBill - Wisp Module
+
+stages:
+  - build
+  - discord
+
+zip_modules:
+  stage: build
+  script:
+    - apt update
+    - apt install zip -y
+    - mkdir wisp-gg
+    - mv admin/ wisp-gg/
+    - mv class.wispgg.php wisp-gg/
+    - zip -r wisp-gg.zip wisp-gg
+  artifacts:
+    paths:
+      - wisp-gg.zip
+    expire_in: 1 month
