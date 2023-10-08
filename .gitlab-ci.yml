@@ -16,7 +16,7 @@ zip_modules:
     - apt update
     - apt install zip -y
     - mkdir wisp-gg
-    - mv admin/ wisp-gg/
+    - mv admin/ wispgg/
     - mv class.wispgg.php wispgg/
     - zip -r wispgg.zip wispgg
   artifacts:
