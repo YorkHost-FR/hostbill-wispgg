@@ -17,9 +17,9 @@ zip_modules:
     - apt install zip -y
     - mkdir wisp-gg
     - mv admin/ wisp-gg/
-    - mv class.wispgg.php wisp-gg/
-    - zip -r wisp-gg.zip wisp-gg
+    - mv class.wispgg.php wispgg/
+    - zip -r wispgg.zip wispgg
   artifacts:
     paths:
-      - wisp-gg.zip
+      - wispgg.zip
     expire_in: 1 month
