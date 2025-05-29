@@ -7,7 +7,7 @@
  *
  * @see DOCS TODO: Once Wisp decides they want to release a **DOCUMENTED** software, fill it in. (Probably never)
  *
- *
+
  * @see  http://dev.hostbillapp.com/dev-kit/provisioning-modules/
  * @author Xephia.eu
  *
@@ -257,6 +257,12 @@ class wispgg extends HostingModule {
             'type' => 'input',
             'default' => false
         ],
+        'uuid' => [
+            'name' => 'uuid',
+            'value' => false,
+            'type' => 'input',
+            'default' => false
+        ],
         'username' => [
             'name' => 'username',
             'value' => false,
@@ -420,7 +426,7 @@ class wispgg extends HostingModule {
         $data['oom_disabled'] = false;
         $data['owner_id'] = $user;
         $data['external_id'] = $this->account_details["id"];
-        $data['name'] = $this->details['domain']['value'];
+        $data['name'] = "Merci YorkHost.fr";
         //$data['nest'] = $this->resource('nest');
         $data['egg_id'] = $this->resource('egg');
         //$data['allocation_limit'] = $this->resource('allocation');
@@ -436,7 +442,7 @@ class wispgg extends HostingModule {
         $data['memory'] = $this->resource('memory') * $mult_mem;
         $data['swap'] = $this->resource('swap') * $mult_mem;
         $data['disk'] = $this->resource('disk') * $mult_disk;
-        $data['io'] = $this->resource('block_io_weight');
+        $data['io'] = '500';
         $data['cpu'] = $this->resource('cpu');
         /*$data['feature_limits'] = [
             'databases' => $this->resource('database'),
@@ -467,7 +473,7 @@ class wispgg extends HostingModule {
         foreach ($nodeAndAllocations["secondary_allocation_ids"] as $idAndPort) {
             $data["secondary_allocations_ids"][] = $idAndPort[0];
         }
-        $data['start_on_completion'] = true;
+        $data['start_on_completion'] = false;
 
         $data = $this->parseVariables($variables, $nodeAndAllocations, $data);
 
@@ -478,6 +484,7 @@ class wispgg extends HostingModule {
                 return false;
             }
             $this->details['device_id']['value'] = $server['attributes']['id'];
+            $this->details['uuid']['value'] = $server['attributes']['uuid'];
             return true;
         }
         return false;
@@ -496,7 +503,7 @@ class wispgg extends HostingModule {
             return false;
         }
         foreach ($nodes as $node) {
-            $node_id = $node['attributes']['id'];
+            $node_id = "75";
             $allocationsResponse = $this->api('nodes/' . $node_id . "/allocations?filter[in_use]=false");
             $allocations = $allocationsResponse['data'];
             if (sizeof($allocations) < $allocation_count) {
@@ -590,7 +597,7 @@ class wispgg extends HostingModule {
                     'password' => $this->details['password']['value'],
                     'email' => $this->client_data['email'],
                     'name_first' => $this->client_data['firstname'],
-                    'name_last' => $this->client_data['lastname'],
+                    'name_last'  => !empty($this->client_data['lastname']) ? $this->client_data['lastname'] : $this->client_data['firstname'],
                     'preferences' => ["language" => $wisp_language]
                 ]);
             } else {
@@ -768,7 +775,7 @@ class wispgg extends HostingModule {
             'memory' => $this->resource('memory') * $mult_mem,
             'swap' => $this->resource('swap') * $mult_mem,
             'disk' => $this->resource('disk') * $mult_disk,
-            'io' => $this->resource('block_io_weight'),
+            'io' => '500',
             'cpu' => $this->resource('cpu'),
             'database_limit' => $this->resource('database'),
             'allocation_limit' => $this->resource('allocation'),
