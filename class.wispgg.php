@@ -311,11 +311,23 @@ class wispgg extends HostingModule {
      *
      * @param array $connect Server details configured in Settings->Apps
      */
-    public function connect($connect) {
-        $this->hostname = $connect['host'];
-        $this->api_key = $connect['field1'];
-        $this->secure = $connect['secure'];
-    }
+public function connect($connect) {
+    $this->hostname = $connect['host'];
+    $this->api_key = $connect['field1'];
+    $this->secure = $connect['secure'];
+
+    $this->logger()->debug('WISP :: connect()', [
+        'hostname' => $this->hostname,
+        'api_key' => $this->api_key,
+        'secure' => $this->secure,
+    ]);
+    $this->logToFile('WISP :: connect()', [
+    'hostname' => $this->hostname,
+    'api_key' => $this->api_key,
+    'secure' => $this->secure,
+]);
+
+}
 
     /**
      * HostBill will call this method when admin clicks on "test Connection" in settings->apps
@@ -334,12 +346,22 @@ class wispgg extends HostingModule {
     /**
      * @return string
      */
-    function _parseHostname() {
-        $hostname = $this->hostname;
-        if (ip2long($hostname) !== false) $hostname = 'http://' . $hostname;
-        else $hostname = ($this->secure ? 'https://' : 'http://') . $hostname;
-        return rtrim($hostname, '/');
+function _parseHostname() {
+    $hostname = $this->hostname;
+    $this->logger()->debug('WISP :: _parseHostname() input', ['hostname' => $hostname]);
+    $this->logToFile('WISP :: _parseHostname() input', ['hostname' => $hostname]);
+    if (ip2long($hostname) !== false) {
+        $hostname = 'http://' . $hostname;
+    } else {
+        $hostname = ($this->secure ? 'https://' : 'http://') . $hostname;
     }
+
+    $hostname = rtrim($hostname, '/');
+
+    $this->logger()->debug('WISP :: _parseHostname() output', ['parsed_hostname' => $hostname]);
+    $this->logToFile('WISP :: _parseHostname() output', ['parsed_hostname' => $hostname]);
+    return $hostname;
+}
 
     /**
      * @param $endpoint
@@ -348,63 +370,79 @@ class wispgg extends HostingModule {
      * @return bool|mixed
      */
     function api($endpoint, $method = "GET", $data = [], $ignoreErrors = []) {
-        $url = $this->_parseHostname() . '/api/admin/' . $endpoint;
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+    $url = $this->_parseHostname() . '/api/admin/' . $endpoint;
+    $curl = curl_init();
+    curl_setopt($curl, CURLOPT_URL, $url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
 
-        $post = json_encode($data);
+    $post = json_encode($data);
 
-        $headers = [
-            "Authorization: Bearer " . $this->api_key,
-            "Accept: Application/vnd.pterodactyl.v1+json",
-            "Content-Type: application/json",
-        ];
-        if ($method === 'POST' || $method === 'PATCH' || $method === 'PUT') {
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
-            $headers[] = "Content-Length: " . strlen($post);
-        }
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-
-        $this->logger()->debug('HB ==> Wisp', [
-            'headers' => $headers,
-            'request body' => $post,
-            'url' => $url,
-            'method' => $method
-        ]);
-        $result = curl_exec($curl);
-        $response = $this->response = json_decode($result, true);
-        $code = $this->response_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $err = curl_error($curl);
-        curl_close($curl);
-
-        $this->logger()->debug('HB <== Wisp', [
-            'result' => $result,
-            'response body' => $response,
-            'code' => $code,
-            'curl err' => $err
-        ]);
-
-        if ($err) {
-            $this->addError('Connection error ' . $err);
-            return false;
-        } else if (isset($response['errors'])) {
-            foreach ($response['errors'] as $error) {
-                if (in_array($error['code'], $ignoreErrors)) {
-                    continue;
-                }
-                $this->addError($error['code'] . ' details: ' . $error['detail']);
-                $this->addError('Endpoint: ' . $endpoint);
-                $this->addError('Method: ' . $method);
-                $this->addError('Data: ' . $post);
-                return false;
-            }
-        }
-        return $response;
+    $headers = [
+        "Authorization: Bearer " . $this->api_key,
+        "Accept: Application/vnd.pterodactyl.v1+json",
+        "Content-Type: application/json",
+    ];
+    if ($method === 'POST' || $method === 'PATCH' || $method === 'PUT') {
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
+        $headers[] = "Content-Length: " . strlen($post);
     }
+    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+
+    $this->logger()->debug('HB ==> Wisp', [
+        'headers' => $headers,
+        'request body' => $post,
+        'url' => $url,
+        'method' => $method
+    ]);
+
+    $result = curl_exec($curl);
+    $response = $this->response = json_decode($result, true);
+    $code = $this->response_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    $err = curl_error($curl);
+    curl_close($curl);
+
+    $this->logger()->debug('HB <== Wisp', [
+        'result' => $result,
+        'response body' => $response,
+        'code' => $code,
+        'curl err' => $err
+    ]);
+
+    // 🔥 FULL FILE LOGGING
+    $this->logToFile('API CALL DEBUG', [
+        'endpoint' => $endpoint,
+        'method' => $method,
+        'url' => $url,
+        'headers' => $headers,
+        'data_sent' => $data,
+        'raw_post' => $post,
+        'curl_response_raw' => $result,
+        'curl_response_decoded' => $response,
+        'http_code' => $code,
+        'curl_error' => $err,
+    ]);
+
+    if ($err) {
+        $this->addError('Connection error ' . $err);
+        return false;
+    } else if (isset($response['errors'])) {
+        foreach ($response['errors'] as $error) {
+            if (in_array($error['code'], $ignoreErrors)) {
+                continue;
+            }
+            $this->addError($error['code'] . ' details: ' . $error['detail']);
+            $this->addError('Endpoint: ' . $endpoint);
+            $this->addError('Method: ' . $method);
+            $this->addError('Data: ' . $post);
+            return false;
+        }
+    }
+    return $response;
+}
+
 
     /**
      * @return bool
@@ -479,7 +517,12 @@ class wispgg extends HostingModule {
 
         $server = $this->api('servers', 'POST', $data);
         if (is_array($server)) {
-            if (!$server['attributes']['id']) {
+            $this->logger()->error('WISP :: Create() response', [
+    'server_response' => $server
+]);
+$this->logToFile('WISP :: Create() response', $server);
+
+if (!$server['attributes']['id']) {
                 $this->addError('Wrong or empty device ID');
                 return false;
             }
@@ -503,7 +546,7 @@ class wispgg extends HostingModule {
             return false;
         }
         foreach ($nodes as $node) {
-            $node_id = "75";
+            $node_id = "53";
             $allocationsResponse = $this->api('nodes/' . $node_id . "/allocations?filter[in_use]=false");
             $allocations = $allocationsResponse['data'];
             if (sizeof($allocations) < $allocation_count) {
@@ -526,6 +569,8 @@ class wispgg extends HostingModule {
                 // [ID, PORT]
                 $nodeAndAllocations["secondary_allocation_ids"][] = [$allocation['attributes']['id'], $allocation['attributes']['port']];
             }
+            $this->logger()->debug('WISP :: Selected node and allocations', $nodeAndAllocations);
+            $this->logToFile('WISP :: Selected node and allocations', $nodeAndAllocations);
             return $nodeAndAllocations;
         }
         $this->addError('No allocations.');
@@ -718,12 +763,24 @@ class wispgg extends HostingModule {
     /**
      * @return bool
      */
-    public function Suspend() {
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/suspension', 'POST', [
-            'suspended' => true
-        ]);
-        return in_array($this->response_code, [200, 204]);
+public function Suspend() {
+    $device_id = $this->account_details['extra_details']['device_id'] ?? null;
+
+    $this->logger()->debug('WISP :: Suspend()', [
+        'device_id' => $device_id
+    ]);
+
+    if (!$device_id) {
+        $this->addError('Missing device_id for suspension.');
+        return false;
     }
+
+    $this->api('servers/' . $device_id . '/suspension', 'POST', [
+        'suspended' => true
+    ]);
+
+    return in_array($this->response_code, [200, 204]);
+}
 
     /**
      * @return bool
@@ -933,6 +990,12 @@ class wispgg extends HostingModule {
     public function getImportType() {
         return ImportAccounts_Model::TYPE_IMPORT_NO_PRODUCTS;
     }
+public function addError($message) {
+    $this->logger()->error('WISP :: Error', ['message' => $message]);
+    $this->logToFile('WISP :: Error', $message);
+    parent::addError($message);
+}
+
 
     function parseVariables($variables, $nodeAndAllocations, $data) {
         $nextAllocation = 0;
@@ -962,5 +1025,9 @@ class wispgg extends HostingModule {
         }
         return $data;
     }
+private function logToFile($label, $data) {
+    $logLine = "[" . date('Y-m-d H:i:s') . "] $label:\n" . print_r($data, true) . "\n\n";
+    file_put_contents('/tmp/wispgg.log', $logLine, FILE_APPEND);
+}
 
 }
