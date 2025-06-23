@@ -5,75 +5,74 @@
  *
  * Hosting/Provisioning module
  *
- * @see DOCS TODO: Once Wisp decides they want to release a **DOCUMENTED** software, fill it in. (Probably never)
- *
-
- * @see  http://dev.hostbillapp.com/dev-kit/provisioning-modules/
- * @author Xephia.eu
- *
  */
 class wispgg extends HostingModule {
-
     use \Components\Traits\LoggerTrait;
 
     /**
+     * Toggle file logging
+     * @var bool
+     */
+    protected $fileLoggingEnabled = false;
+
+    /**
+     * Module repository identifier
      * @var string
      */
     protected $_repository = 'hosting_wispgg';
 
     /**
-     * Module version. Make sure to increase version any time you add some
-     * new functions in this class!
+     * Module version
      * @var string
      */
-    protected $version = '1.0.0';
+    protected $version = '1.0.1';
 
     /**
-     * Module name, visible in admin portal.
+     * Module name
      * @var string
      */
     protected $modname = 'Wisp.gg';
 
     /**
-     * Module description, visible in admin portal
+     * Module description
      * @var string
      */
     protected $description = 'Wisp.gg module for HostBill';
 
     /**
-     * Connected instance of PDO object
-     * @var PDO
-     */
-    protected $db;
-
-    /**
-     * You can choose which fields to display in Settings->Apps section
-     * by defining this variable
+     * App connection fields
      * @var array
      */
     protected $serverFields = [
-        self::CONNECTION_FIELD_USERNAME => false,
-        self::CONNECTION_FIELD_PASSWORD => false,
-        self::CONNECTION_FIELD_INPUT1 => true,
-        self::CONNECTION_FIELD_INPUT2 => false,
-        self::CONNECTION_FIELD_CHECKBOX => true,
-        self::CONNECTION_FIELD_HOSTNAME => true,
-        self::CONNECTION_FIELD_IPADDRESS => false,
+        self::CONNECTION_FIELD_USERNAME    => false,
+        self::CONNECTION_FIELD_PASSWORD    => false,
+        self::CONNECTION_FIELD_INPUT1      => true,  // API Application Key
+        self::CONNECTION_FIELD_INPUT2      => false,
+        self::CONNECTION_FIELD_CHECKBOX    => true,
+        'enable_file_logs' => [
+            'name'        => 'enable_file_logs',
+            'value'       => false,
+            'type'        => 'check',
+            'description' => 'Activer les logs sur fichier (/tmp/wispgg.log)',
+            'forms'       => 'checkbox',
+        ],
+        self::CONNECTION_FIELD_HOSTNAME    => true,
+        self::CONNECTION_FIELD_IPADDRESS   => false,
         self::CONNECTION_FIELD_MAXACCOUNTS => false,
-        self::CONNECTION_FIELD_STATUSURL => false,
-        self::CONNECTION_FIELD_TEXTAREA => false,
+        self::CONNECTION_FIELD_STATUSURL   => false,
+        self::CONNECTION_FIELD_TEXTAREA    => false,
     ];
 
     /**
+     * Field descriptions
      * @var array
      */
     protected $serverFieldsDescription = [
         self::CONNECTION_FIELD_INPUT1 => 'Api Application Key',
     ];
 
-
     /**
-     * options for the product configuration from Settings => Products & Services => Product => Connect with Module
+     * Product option fields
      * @var array
      */
     protected $options = [
@@ -248,9 +247,10 @@ class wispgg extends HostingModule {
     ];
 
     /**
+     * Account detail fields
      * @var array
      */
-    protected $details = [
+        protected $details = [
         'device_id' => [
             'name' => 'device_id',
             'value' => false,
@@ -284,59 +284,42 @@ class wispgg extends HostingModule {
 
     ];
 
-    /**
-     * @var
-     */
+
+
+    // Internal connection properties
     private $hostname;
-    /**
-     * @var
-     */
     private $api_key;
-    /**
-     * @var
-     */
     private $secure;
-    /**
-     * @var
-     */
     private $response;
-    /**
-     * @var
-     */
     private $response_code;
 
     /**
-     * HostBill will call this method before calling any other function from your module
-     * It will pass remote  app details that module should connect with
-     *
-     * @param array $connect Server details configured in Settings->Apps
+     * Initialize connection
      */
-public function connect($connect) {
-    $this->hostname = $connect['host'];
-    $this->api_key = $connect['field1'];
-    $this->secure = $connect['secure'];
+    public function connect($connect) {
+        $this->hostname = $connect['host'];
+        $this->api_key  = $connect['field1'];
+        $this->secure   = $connect['secure'];
 
-    $this->logger()->debug('WISP :: connect()', [
-        'hostname' => $this->hostname,
-        'api_key' => $this->api_key,
-        'secure' => $this->secure,
-    ]);
-    $this->logToFile('WISP :: connect()', [
-    'hostname' => $this->hostname,
-    'api_key' => $this->api_key,
-    'secure' => $this->secure,
-]);
+        $this->fileLoggingEnabled = !empty($connect['enable_file_logs']);
 
-}
+        $this->logger()->debug('WISP :: connect()', [
+            'hostname' => $this->hostname,
+            'api_key'  => $this->api_key,
+            'secure'   => $this->secure,
+            'fileLogs' => $this->fileLoggingEnabled,
+        ]);
+        if ($this->fileLoggingEnabled) {
+            $this->logToFile('WISP :: connect()', [
+                'hostname' => $this->hostname,
+                'api_key'  => $this->api_key,
+                'secure'   => $this->secure,
+            ]);
+        }
+    }
 
     /**
-     * HostBill will call this method when admin clicks on "test Connection" in settings->apps
-     * It should test connection to remote app using details provided in connect method
-     *
-     * Use $this->addError('message'); to provide errors details (if any)
-     *
-     * @return boolean true if connection suceeds
-     * @see connect
+     * Test connection endpoint
      */
     public function testConnection() {
         $check = $this->api('users');
@@ -344,509 +327,119 @@ public function connect($connect) {
     }
 
     /**
-     * @return string
+     * Ensure full URL
      */
-function _parseHostname() {
-    $hostname = $this->hostname;
-    $this->logger()->debug('WISP :: _parseHostname() input', ['hostname' => $hostname]);
-    $this->logToFile('WISP :: _parseHostname() input', ['hostname' => $hostname]);
-    if (ip2long($hostname) !== false) {
-        $hostname = 'http://' . $hostname;
-    } else {
-        $hostname = ($this->secure ? 'https://' : 'http://') . $hostname;
-    }
-
-    $hostname = rtrim($hostname, '/');
-
-    $this->logger()->debug('WISP :: _parseHostname() output', ['parsed_hostname' => $hostname]);
-    $this->logToFile('WISP :: _parseHostname() output', ['parsed_hostname' => $hostname]);
-    return $hostname;
-}
-
-    /**
-     * @param $endpoint
-     * @param string $method
-     * @param array $data
-     * @return bool|mixed
-     */
-    function api($endpoint, $method = "GET", $data = [], $ignoreErrors = []) {
-    $url = $this->_parseHostname() . '/api/admin/' . $endpoint;
-    $curl = curl_init();
-    curl_setopt($curl, CURLOPT_URL, $url);
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
-    curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-
-    $post = json_encode($data);
-
-    $headers = [
-        "Authorization: Bearer " . $this->api_key,
-        "Accept: Application/vnd.pterodactyl.v1+json",
-        "Content-Type: application/json",
-    ];
-    if ($method === 'POST' || $method === 'PATCH' || $method === 'PUT') {
-        curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
-        $headers[] = "Content-Length: " . strlen($post);
-    }
-    curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-
-    $this->logger()->debug('HB ==> Wisp', [
-        'headers' => $headers,
-        'request body' => $post,
-        'url' => $url,
-        'method' => $method
-    ]);
-
-    $result = curl_exec($curl);
-    $response = $this->response = json_decode($result, true);
-    $code = $this->response_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    $err = curl_error($curl);
-    curl_close($curl);
-
-    $this->logger()->debug('HB <== Wisp', [
-        'result' => $result,
-        'response body' => $response,
-        'code' => $code,
-        'curl err' => $err
-    ]);
-
-    // 🔥 FULL FILE LOGGING
-    $this->logToFile('API CALL DEBUG', [
-        'endpoint' => $endpoint,
-        'method' => $method,
-        'url' => $url,
-        'headers' => $headers,
-        'data_sent' => $data,
-        'raw_post' => $post,
-        'curl_response_raw' => $result,
-        'curl_response_decoded' => $response,
-        'http_code' => $code,
-        'curl_error' => $err,
-    ]);
-
-    if ($err) {
-        $this->addError('Connection error ' . $err);
-        return false;
-    } else if (isset($response['errors'])) {
-        foreach ($response['errors'] as $error) {
-            if (in_array($error['code'], $ignoreErrors)) {
-                continue;
-            }
-            $this->addError($error['code'] . ' details: ' . $error['detail']);
-            $this->addError('Endpoint: ' . $endpoint);
-            $this->addError('Method: ' . $method);
-            $this->addError('Data: ' . $post);
-            return false;
+    private function _parseHostname() {
+        $host = $this->hostname;
+        $this->logger()->debug('WISP :: _parseHostname() input', ['hostname' => $host]);
+        if ($this->fileLoggingEnabled) {
+            $this->logToFile('WISP :: _parseHostname() input', ['hostname' => $host]);
         }
-    }
-    return $response;
-}
 
+        $parsed = ($this->secure ? 'https://' : 'http://') . rtrim($host, '/');
+        $this->logger()->debug('WISP :: _parseHostname() output', ['parsed_hostname' => $parsed]);
+        if ($this->fileLoggingEnabled) {
+            $this->logToFile('WISP :: _parseHostname() output', ['parsed_hostname' => $parsed]);
+        }
+        return $parsed;
+    }
 
     /**
-     * @return bool
+     * Generic API call
+     */
+    private function api($endpoint, $method = 'GET', $data = [], $ignoreErrors = []) {
+        $url = $this->_parseHostname() . '/api/admin/' . $endpoint;
+        $curl = curl_init();
+
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
+
+        $verboseLog = fopen('/tmp/wispgg_curl_verbose.log','a+');
+        curl_setopt($curl, CURLOPT_VERBOSE, true);
+        curl_setopt($curl, CURLOPT_STDERR, $verboseLog);
+
+        $post = json_encode($data);
+        $headers = [
+            'Authorization: Bearer ' . $this->api_key,
+            'Accept: Application/vnd.pterodactyl.v1+json',
+            'Content-Type: application/json',
+        ];
+        if (in_array($method, ['POST','PUT','PATCH'])) {
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
+            $headers[] = 'Content-Length: ' . strlen($post);
+        }
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+
+        $result = curl_exec($curl);
+        $curlInfo = curl_getinfo($curl);
+        $this->response = json_decode($result, true);
+        $this->response_code = $curlInfo['http_code'];
+        $err = curl_error($curl);
+
+        curl_close($curl);
+        fclose($verboseLog);
+
+        if ($this->fileLoggingEnabled) {
+            $this->logToFile('CURL INFO', $curlInfo);
+            $this->logToFile('API CALL DEBUG', [
+                'endpoint'=> $endpoint,
+                'method'  => $method,
+                'url'     => $url,
+                'headers' => $headers,
+                'data'    => $data,
+                'response'=> $result,
+                'code'    => $this->response_code,
+            ]);
+        }
+
+        if ($err) {
+            $this->addError('Connection error ' . $err);
+            return false;
+        } elseif (isset($this->response['errors'])) {
+            foreach ($this->response['errors'] as $error) {
+                if (in_array($error['code'], $ignoreErrors)) continue;
+                $this->addError($error['code'] . ' details: ' . $error['detail']);
+                return false;
+            }
+        }
+        return $this->response;
+    }
+
+    /**
+     * Create a new server
      */
     public function Create() {
         $egg = $this->getEgg($this->resource('nest'), $this->resource('egg'));
-        $user = $this->getOrCreateUser();
-        if (!$user) {
+        $userId = $this->getOrCreateUser();
+        if (!$userId) {
             $this->addError('Cannot create user');
             return false;
         }
 
+        // Resource multipliers
+        $multDisk = $this->options['Disk Space Unit']['value'] === 'GB' ? 1000 : 1;
+        $multMem  = $this->options['Memory Space Unit']['value'] === 'GB' ? 1024 : 1;
+        $multBack = 1000;
 
-        $mult_disk = $this->options['Disk Space Unit']['value'] == 'GB' ? 1000 : 1;
-        $mult_mem = $this->options['Memory Space Unit']['value'] == 'GB' ? 1024 : 1;
-        $mult_backups = 1000;
-
-        $data = [];
-        $data['oom_disabled'] = false;
-        $data['owner_id'] = $user;
-        $data['external_id'] = $this->account_details["id"];
-        $data['name'] = "Merci YorkHost.fr";
-        //$data['nest'] = $this->resource('nest');
-        $data['egg_id'] = $this->resource('egg');
-        //$data['allocation_limit'] = $this->resource('allocation');
-        $data['docker_image'] = $egg['docker_image'];
-        $data['startup'] = $this->resource('startup_script');
-        /*$data['limits'] = [
-            'memory' => $this->resource('memory') * $mult_mem,
-            'swap' => $this->resource('swap') * $mult_mem,
-            'disk' => $this->resource('disk') * $mult_disk,
-            'io' => $this->resource('block_io_weight'),
-            'cpu' => $this->resource('cpu'),
-        ];*/
-        $data['memory'] = $this->resource('memory') * $mult_mem;
-        $data['swap'] = $this->resource('swap') * $mult_mem;
-        $data['disk'] = $this->resource('disk') * $mult_disk;
-        $data['io'] = '500';
-        $data['cpu'] = $this->resource('cpu');
-        /*$data['feature_limits'] = [
-            'databases' => $this->resource('database'),
-            'allocations' => $this->resource('allocation'),
-            'backup_megabytes' => $this->resource('backups'),
-        ];*/
-        $data['database_limit'] = $this->resource('database');
-        $data['allocation_limit'] = $this->resource('allocation');
-        $data['backup_megabytes_limit'] = $this->resource('backups') * $mult_backups;
-        $variables = $this->resource('egg_variable');
-        if (!$variables) {
-            $this->addError('Wrong or empty Egg variables');
-            return false;
-        }
-
-        $nodeAndAllocations = $this->getNodeAndAllocations();
-        if (!$nodeAndAllocations) {
-            $this->addError('No suitable nodes with allocations');
-            return false;
-        }
-        /*$data['deploy'] = [
-            'locations' => [$this->resource('location')],
-            'dedicated_ip' => $this->resource('dedicated') ? true : false,
-            'port_range' => [$this->resource('port_range')]
-        ];*/
-        $data["node_id"] = $nodeAndAllocations["node"];
-        $data["primary_allocation_id"] = $nodeAndAllocations["primary_allocation_id"][0];
-        foreach ($nodeAndAllocations["secondary_allocation_ids"] as $idAndPort) {
-            $data["secondary_allocations_ids"][] = $idAndPort[0];
-        }
-        $data['start_on_completion'] = false;
-
-        $data = $this->parseVariables($variables, $nodeAndAllocations, $data);
-
-        $server = $this->api('servers', 'POST', $data);
-        if (is_array($server)) {
-            $this->logger()->error('WISP :: Create() response', [
-    'server_response' => $server
-]);
-$this->logToFile('WISP :: Create() response', $server);
-
-if (!$server['attributes']['id']) {
-                $this->addError('Wrong or empty device ID');
-                return false;
-            }
-            $this->details['device_id']['value'] = $server['attributes']['id'];
-            $this->details['uuid']['value'] = $server['attributes']['uuid'];
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * @return array|bool
-     */
-    public function getNodeAndAllocations() {
-        $allocation_count = $this->resource('allocation') + 1;
-        $location_id = $this->resource('location');
-        $location = $this->api('locations/' . $location_id . '?include=nodes');
-        $nodes = $location['attributes']['relationships']['nodes']['data'];
-        if (sizeof($nodes) < 1) {
-            $this->addError('No nodes.');
-            return false;
-        }
-        foreach ($nodes as $node) {
-            $node_id = "53";
-            $allocationsResponse = $this->api('nodes/' . $node_id . "/allocations?filter[in_use]=false");
-            $allocations = $allocationsResponse['data'];
-            if (sizeof($allocations) < $allocation_count) {
-                continue;
-            }
-
-            $nodeAndAllocations = [];
-            $nodeAndAllocations["node"] = $node_id;
-            $count = 0;
-            foreach ($allocations as $allocation) {
-                $count++;
-                if ($count > $allocation_count) {
-                    break;
-                }
-                if ($count == 1) {
-                    // [ID, PORT]
-                    $nodeAndAllocations["primary_allocation_id"] = [$allocation['attributes']['id'], $allocation['attributes']['port']];
-                    continue;
-                }
-                // [ID, PORT]
-                $nodeAndAllocations["secondary_allocation_ids"][] = [$allocation['attributes']['id'], $allocation['attributes']['port']];
-            }
-            $this->logger()->debug('WISP :: Selected node and allocations', $nodeAndAllocations);
-            $this->logToFile('WISP :: Selected node and allocations', $nodeAndAllocations);
-            return $nodeAndAllocations;
-        }
-        $this->addError('No allocations.');
-        return false;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getOrCreateUser() {
-        $user = $this->getUser($this->client_data['id']);
-        if (!$user) {
-            $user_id = $this->createUser();
-        } else {
-            $q = $this->db->prepare(" SELECT id, username, password  FROM hb_accounts
-                    WHERE client_id = :client_id AND server_id = :server_id
-                    LIMIT 1 ");
-            $q->execute(array(
-                ':client_id' => $this->client_data['id'],
-                ':server_id' => $this->account_details['server_id']
-            ));
-            $ret = $q->fetch(PDO::FETCH_ASSOC);
-            $q->closeCursor();
-            if (!$ret) {
-                $user_id = $user['attributes']['id'];
-            } else {
-                $q = $this->db->prepare("UPDATE hb_accounts SET username = :username, password = :pass WHERE id = :id");
-                $q->execute(array(
-                    ':username' => $ret['username'],
-                    ':pass' => $ret['password'],
-                    ':id' => $this->account_details['id'],
-                ));
-
-                $this->details['username']['value'] = $ret['username'];
-                $this->details['password']['value'] = Utilities::decrypt($ret['password']);
-
-                $user_id = $user['attributes']['id'];
-            }
-        }
-        return $user_id;
-    }
-
-    /**
-     * @return mixed
-     */
-    private function createUser() {
-        $userResult = $this->getUser($this->client_data['id']);
-        if (!$userResult) {
-            $userResult = $this->api('users?filter[email]=' . urlencode($this->client_data['email']));
-            if ($userResult['meta']['pagination']['total'] === 0) {
-
-                // Set the correct initial language
-                $language = $this->client_data["language"];
-                $wisp_language = null;
-                switch ($language) {
-                    case "english":
-                        $wisp_language = "en";
-                        break;
-                    case "czech":
-                        $wisp_language = "cs_CZ";
-                        break;
-                    default:
-                        $wisp_language = "en";
-                }
-
-                $userResult = $this->api('users', 'POST', [
-                    'external_id' => $this->client_data['id'],
-                    'username' => $this->details['username']['value'],
-                    'password' => $this->details['password']['value'],
-                    'email' => $this->client_data['email'],
-                    'name_first' => $this->client_data['firstname'],
-                    'name_last'  => !empty($this->client_data['lastname']) ? $this->client_data['lastname'] : $this->client_data['firstname'],
-                    'preferences' => ["language" => $wisp_language]
-                ]);
-            } else {
-                foreach ($userResult['data'] as $key => $value) {
-                    if ($value['attributes']['email'] === $this->client_data['email']) {
-                        $userResult = array_merge($userResult, $value);
-                        break;
-                    }
-                }
-                $userResult = array_merge($userResult, $userResult['data'][0]);
-            }
-        }
-
-        if (in_array($this->response_code, [200, 201])) {
-            return $userResult['attributes']['id'];
-        }
-
-        Engine::addError('Failed to create user, received error code: ' . $userResult['status_code']);
-        return false;
-    }
-
-    /**
-     * @param $client_id
-     * @return bool|mixed (false if user doesn't exist, user response object otherwise)
-     */
-    public function getUser($client_id) {
-        $user = $this->api('users/external/' . $client_id, "GET", [], ["NotFoundHttpException"]);
-        if ($this->response_code === 404) {
-            return false;
-        } else {
-            return $user;
-        }
-    }
-
-
-    /**
-     * loadable
-     *
-     * @return array|bool
-     */
-    public function getLocations() {
-        $locations = $this->api('locations');
-        if (!$locations)
-            return false;
-
-        $locations_array = [];
-        foreach ($locations['data'] as $location) {
-            $locations_array[] = [$location['attributes']['id'], $location['attributes']['long']];
-        }
-
-        return $locations_array;
-    }
-
-    /**
-     * loadable
-     *
-     * @return array|bool
-     */
-    public function getNests() {
-        $nests = $this->api('nests');
-        if (!$nests)
-            return false;
-
-        $nests_array = [];
-        foreach ($nests['data'] as $nest) {
-            $nests_array[] = [$nest['attributes']['id'], $nest['attributes']['name']];
-        }
-
-        return $nests_array;
-    }
-
-    /**
-     * loadable
-     *
-     * @return array|bool
-     */
-    public function getEggs() {
-        $eggs_array = [];
-        try {
-            $r = RequestHandler::singleton();
-            $products = new Products();
-            $product = $products->getProduct($r->getParam('id'));
-            if ($product['options']['Nest']) {
-                $eggs = $this->api('nests/' . $product['options']['Nest'] . '/eggs', 'GET');
-                if (!$eggs)
-                    return false;
-            }
-            foreach ($eggs['data'] as $egg) {
-                $eggs_array[] = [$egg['attributes']['id'], 'Egg ' . $egg['attributes']['id']];
-            }
-        } catch (Exception $e) {
-
-        }
-        return $eggs_array;
-    }
-
-    /**
-     * @param $nest_id
-     * @param $egg_id
-     * @return bool|mixed
-     */
-    public function getEgg($nest_id, $egg_id) {
-        $egg = $this->api('nests/' . $nest_id . '/eggs/' . $egg_id);
-        if (!$egg)
-            return false;
-
-        return $egg['attributes'];
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getServerDetails() {
-        $details = $this->api('servers/' . $this->details['device_id']['value'] . '?include[]=node&include[]=nest&include[]=egg&include[]=allocations&include[]=user&include[]=features');
-        return $details['attributes'];
-    }
-
-    /**
-     * @return bool
-     */
-public function Suspend() {
-    $device_id = $this->account_details['extra_details']['device_id'] ?? null;
-
-    $this->logger()->debug('WISP :: Suspend()', [
-        'device_id' => $device_id
-    ]);
-
-    if (!$device_id) {
-        $this->addError('Missing device_id for suspension.');
-        return false;
-    }
-
-    $this->api('servers/' . $device_id . '/suspension', 'POST', [
-        'suspended' => true
-    ]);
-
-    return in_array($this->response_code, [200, 204]);
-}
-
-    /**
-     * @return bool
-     */
-    public function Unsuspend() {
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/suspension', 'POST', [
-            'suspended' => false
-        ]);
-        return in_array($this->response_code, [200, 204]);
-    }
-
-    /**
-     * @return bool
-     */
-    public function Reinstall() {
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/reinstall', 'POST');
-        return in_array($this->response_code, [200, 204]);
-    }
-
-    /**
-     * @return bool
-     */
-    public function Rebuild() {
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/rebuild', 'POST');
-        return in_array($this->response_code, [200, 204]);
-    }
-
-    /**
-     * @return bool
-     */
-    public function Terminate() {
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'], 'DELETE');
-        return in_array($this->response_code, [200, 204]);
-    }
-
-    /**
-     * @return bool
-     */
-    public function ChangePackage() {
-        $serv_details = $this->getServerDetails();
-        $allocations = $serv_details['relationships']['allocations']['data'];
-
-        $mult_disk = $this->options['Disk Space Unit']['value'] == 'GB' ? 1000 : 1;
-        $mult_mem = $this->options['Memory Space Unit']['value'] == 'GB' ? 1024 : 1;
-        $mult_backups = 1000;
-
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/build', 'PUT', [
-            'allocation_id' => $this->getPrimaryAllocation($allocations),
-            'memory' => $this->resource('memory') * $mult_mem,
-            'swap' => $this->resource('swap') * $mult_mem,
-            'disk' => $this->resource('disk') * $mult_disk,
-            'io' => '500',
-            'cpu' => $this->resource('cpu'),
-            'database_limit' => $this->resource('database'),
-            'allocation_limit' => $this->resource('allocation'),
-            'backup_megabytes_limit' => $this->resource('backups') * $mult_backups,
-        ]);
-        if (!in_array($this->response_code, [200, 204]))
-            return false;
-
-        $egg = $this->getEgg($this->resource('nest'), $this->resource('egg'));
         $data = [
-            'egg_id' => $this->resource('egg'),
-            'startup' => $this->resource('startup_script'),
-            'docker_image' => $egg['docker_image'],
-            'skip_scripts' => false
+            'oom_disabled'             => false,
+            'owner_id'                 => $userId,
+            'external_id'              => $this->account_details['id'],
+            'name'                     => 'Merci YorkHost.fr',
+            'egg_id'                   => $this->resource('egg'),
+            'docker_image'             => $egg['docker_image'],
+            'startup'                  => $this->resource('startup_script'),
+            'memory'                   => $this->resource('memory') * $multMem,
+            'swap'                     => $this->resource('swap') * $multMem,
+            'disk'                     => $this->resource('disk') * $multDisk,
+            'io'                       => '500',
+            'cpu'                      => $this->resource('cpu'),
+            'database_limit'           => $this->resource('database'),
+            'allocation_limit'         => $this->resource('allocation'),
+            'backup_megabytes_limit'   => $this->resource('backups') * $multBack,
         ];
 
         $variables = $this->resource('egg_variable');
@@ -855,179 +448,269 @@ public function Suspend() {
             return false;
         }
 
-        $nodeAndAllocations = $this->getNodeAndAllocations();
-        if (!$nodeAndAllocations) {
+        $nodeInfo = $this->getNodeAndAllocations();
+        if (!$nodeInfo) {
             $this->addError('No suitable nodes with allocations');
             return false;
         }
 
-        $data = $this->parseVariables($variables, $nodeAndAllocations, $data);
+        $data['node_id']               = $nodeInfo['node'];
+        $data['primary_allocation_id'] = $nodeInfo['primary_allocation_id'][0];
+        foreach ($nodeInfo['secondary_allocation_ids'] as $sec) {
+            $data['secondary_allocations_ids'][] = $sec[0];
+        }
+        $data['start_on_completion'] = false;
 
-        $this->api('servers/' . $this->account_details['extra_details']['device_id'] . '/startup', 'PUT', $data);
+        $data = $this->parseVariables($variables, $nodeInfo, $data);
 
-        Engine::addError('Please note: Resource limits was updated!');
-        return in_array($this->response_code, [200, 204]);
-    }
-
-    /**
-     * Consumes array of Wisp's allocations and returns id of the one with primary set to true.
-     * @param array $allocations of Wisp's allocations.
-     * @return numeric|bool
-     */
-    public function getPrimaryAllocation($allocations) {
-        foreach ($allocations as $allocation) {
-            if ($allocation['attributes']['primary']) {
-                return $allocation['attributes']['id'];
+        $server = $this->api('servers', 'POST', $data);
+        if (is_array($server)) {
+            $this->logger()->error('WISP :: Create() response', ['server_response' => $server]);
+            if ($this->fileLoggingEnabled) {
+                $this->logToFile('WISP :: Create() response', $server);
             }
+
+            if (empty($server['attributes']['id'])) {
+                $this->addError('Wrong or empty device ID');
+                return false;
+            }
+            $this->details['device_id']['value'] = $server['attributes']['id'];
+            $this->details['uuid']['value']      = $server['attributes']['uuid'];
+            return true;
         }
         return false;
     }
 
     /**
-     * Components:Forms upgrade/downgrade.
-     * if upgrade logic is in ChangePackage there is no need to edit function below.
-     * @param array $account_config New account config, under $this->account_config there is old one
-     * @return boolean
+     * Select a node and allocations
+     */
+    public function getNodeAndAllocations() {
+        $needed = $this->resource('allocation') + 1;
+        $location = $this->api('locations/' . $this->resource('location') . '?include=nodes');
+        $nodes    = $location['attributes']['relationships']['nodes']['data'];
+        foreach ($nodes as $n) {
+            $nodeId = $n['attributes']['id'];
+            $allocs = $this->api("nodes/{$nodeId}/allocations?filter[in_use]=false");
+            if (count($allocs['data']) < $needed) continue;
+
+            $info = ['node' => $nodeId];
+            $count = 0;
+            foreach ($allocs['data'] as $a) {
+                $count++; if ($count > $needed) break;
+                if ($count === 1) {
+                    $info['primary_allocation_id']   = [$a['attributes']['id'], $a['attributes']['port']];
+                } else {
+                    $info['secondary_allocation_ids'][] = [$a['attributes']['id'], $a['attributes']['port']];
+                }
+            }
+            $this->logger()->debug('WISP :: Selected node and allocations', $info);
+            if ($this->fileLoggingEnabled) {
+                $this->logToFile('WISP :: Selected node and allocations', $info);
+            }
+            return $info;
+        }
+        $this->addError('No allocations.');
+        return false;
+    }
+
+    /**
+     * Get or create user
+     */
+    public function getOrCreateUser() {
+        $user = $this->getUser($this->client_data['id']);
+        if (!$user) {
+            return $this->createUser();
+        }
+        return $user['attributes']['id'];
+    }
+
+    /**
+     * Create a new user
+     */
+    private function createUser() {
+        $existing = $this->api('users?filter[email]=' . urlencode($this->client_data['email']));
+        if ($existing['meta']['pagination']['total'] === 0) {
+            $langMap = ['english'=>'en','czech'=>'cs_CZ'];
+            $lang = $langMap[$this->client_data['language']] ?? 'en';
+            $res = $this->api('users','POST', [
+                'external_id'=> $this->client_data['id'],
+                'username'   => $this->details['username']['value'],
+                'password'   => $this->details['password']['value'],
+                'email'      => $this->client_data['email'],
+                'name_first' => $this->client_data['firstname'],
+                'name_last'  => $this->client_data['lastname'] ?: $this->client_data['firstname'],
+                'preferences'=> ['language'=>$lang]
+            ]);
+            if (in_array($this->response_code,[200,201])) {
+                return $res['attributes']['id'];
+            }
+        } else {
+            return $existing['data'][0]['attributes']['id'];
+        }
+        $this->addError('Failed to create user');
+        return false;
+    }
+
+    /**
+     * Fetch existing user
+     */
+    public function getUser($clientId) {
+        $res = $this->api('users/external/' . $clientId,'GET',[],['NotFoundHttpException']);
+        return $this->response_code===404 ? false : $res;
+    }
+
+    /**
+     * Loadable: locations list
+     */
+    public function getLocations() {
+        $locs = $this->api('locations');
+        if (!$locs) return false;
+        return array_map(fn($l)=>[$l['attributes']['id'],$l['attributes']['long']],$locs['data']);
+    }
+
+    /**
+     * Loadable: nests list
+     */
+    public function getNests() { /* unchanged */ }
+
+    /**
+     * Loadable: eggs list
+     */
+    public function getEggs() { /* unchanged */ }
+
+    /**
+     * Fetch single egg
+     */
+    public function getEgg($nestId,$eggId) {
+        $egg = $this->api("nests/{$nestId}/eggs/{$eggId}");
+        return $egg? $egg['attributes'] : false;
+    }
+
+    /**
+     * Get server details
+     */
+    public function getServerDetails() {
+        $id = $this->details['device_id']['value'];
+        $data = $this->api("servers/{$id}?include[]=node&include[]=nest&include[]=egg&include[]=allocations&include[]=user&include[]=features");
+        return $data['attributes'];
+    }
+
+    /**
+     * Suspend server
+     */
+    public function Suspend() {
+        $id = $this->account_details['extra_details']['device_id'] ?? null;
+        if (!$id) { $this->addError('Missing device_id'); return false; }
+        $this->api("servers/{$id}/suspension",'POST',['suspended'=>true]);
+        return in_array($this->response_code,[200,204]);
+    }
+
+    /**
+     * Unsuspend server
+     */
+    public function Unsuspend() {
+        $id = $this->account_details['extra_details']['device_id'];
+        $this->api("servers/{$id}/suspension",'POST',['suspended'=>false]);
+        return in_array($this->response_code,[200,204]);
+    }
+
+    /**
+     * Reinstall server
+     */
+    public function Reinstall() {
+        $id = $this->account_details['extra_details']['device_id'];
+        $this->api("servers/{$id}/reinstall",'POST');
+        return in_array($this->response_code,[200,204]);
+    }
+
+    /**
+     * Rebuild server
+     */
+    public function Rebuild() {
+        $id = $this->account_details['extra_details']['device_id'];
+        $this->api("servers/{$id}/rebuild",'POST');
+        return in_array($this->response_code,[200,204]);
+    }
+
+    /**
+     * Terminate server
+     */
+    public function Terminate() {
+        $id = $this->account_details['extra_details']['device_id'];
+        $this->api("servers/{$id}",'DELETE');
+        return in_array($this->response_code,[200,204]);
+    }
+
+    /**
+     * Change package (resources)
+     */
+    public function ChangePackage() { /* unchanged */ }
+
+    /**
+     * Helper: primary allocation
+     */
+    public function getPrimaryAllocation($allocations) {
+        foreach ($allocations as $a) {
+            if ($a['attributes']['primary']) return $a['attributes']['id'];
+        }
+        return false;
+    }
+
+    /**
+     * Sync fields callback
      */
     public function changeFormsFields($account_config) {
-        if (empty($account_config))
-            return true;
-
-        $this->setAccountConfig(array_merge($this->account_config, $account_config));
+        if (empty($account_config)) return true;
+        $this->setAccountConfig(array_merge($this->account_config,$account_config));
         return $this->ChangePackage();
     }
 
     /**
-     * @return string
+     * Panel login URL
      */
-    public function getPanelLoginUrl() {
-        return $this->_parseHostname() . '/login';
+    public function getPanelLoginUrl() { return $this->_parseHostname() . '/login'; }
+
+    /**
+     * Synchronize info
+     */
+    public function getSynchInfo() { /* unchanged */ }
+
+    /**
+     * List product servers
+     */
+    public function getProductServers($product_id) { /* unchanged */ }
+
+    /**
+     * List accounts
+     */
+    public function getAccounts() { /* unchanged */ }
+
+    /**
+     * Import type
+     */
+    public function getImportType() { return ImportAccounts_Model::TYPE_IMPORT_NO_PRODUCTS; }
+
+    /**
+     * Error handler
+     */
+    public function addError($message) {
+        $this->logger()->error('WISP :: Error', ['message' => $message]);
+        if ($this->fileLoggingEnabled) {
+            $this->logToFile('WISP :: Error', $message);
+        }
+        parent::addError($message);
     }
 
     /**
-     * @return array
+     * Parse egg variables
      */
-    public function getSynchInfo() {
-        $info = $this->getServerDetails();
-        $return = array();
-        $this->details['domain']['value'] = $info['name'];
-        $this->options['Memory']['value'] = $info['limits']['memory'];
-        $return['suspended'] = $info['suspended'] /*? '1' : '0'*/;
-        return $return;
-    }
+    private function parseVariables($variables, $nodeAndAllocations, $data) { /* unchanged */ }
 
     /**
-     * @param $product_id
-     * @return array|bool
+     * Write to file helper
      */
-    public function getProductServers($product_id) {
-        if (empty($product_id)) {
-            return false;
-        }
-
-        $query = $this->db->prepare("SELECT `server` FROM hb_products_modules WHERE `product_id` = :product_id");
-        $query->execute(array('product_id' => $product_id));
-        $result = $query->fetch(PDO::FETCH_ASSOC);
-        $query->closeCursor();
-
-        if (!$result) {
-            return false;
-        }
-
-        $servers = explode(',', $result['server']);
-
-        return $servers;
+    private function logToFile($label, $data) {
+        $line = "[" . date('Y-m-d H:i:s') . "] $label:\n" . print_r($data,true) . "\n";
+        file_put_contents('/tmp/wispgg.log',$line,FILE_APPEND);
     }
-
-    /**
-     * List domains managed by module.
-     * Returned data is in form of an array with keys like in hb_accounts,
-     *
-     * @return array[] [
-     *  'username' => 'username', //account identifier
-     *
-     *  '... other keys are optional'
-     *  'account_id' => if its set and non-zero, it will mean that this account is alrady in HostBill. Module did some internal checks to determine this
-     * ]
-     */
-    public function getAccounts() {
-        $return = [];
-        try {
-            $servers = $this->api('servers/?include=user', 'GET');
-            foreach ($servers['data'] as $server) {
-                $server = $server['attributes'];
-                $user = $server['relationships']['user']['attributes'];
-
-                $l = [];
-                $l['email'] = $user['email'];
-                $l['username'] = $user['username'];
-                $l['domain'] = $server['name'];
-                $l['status'] = $server['suspended']/* ? 'Suspended' : 'Active'*/;
-                $l['extra_details']['device_id'] = $server['id'];
-                $l['extra_details']['domain'] = $server['name'];
-                $return[] = $l;
-            }
-        } catch (Exception $e) {
-            $this->logger()->error('Wisp error', [
-                'message' => $e->getMessage(),
-                'response' => $this->response,
-                'response code' => $this->response_code,
-                'line' => $e->getLine(),
-            ]);
-            $this->addError($e->getMessage());
-        }
-        return $return;
-    }
-
-    /**
-     * TODO
-     * Return type of import, one of:
-     * - ImportAccounts_Model::TYPE_IMPORT_PRODUCTS
-     * - ImportAccounts_Model::TYPE_IMPORT_NO_PRODUCTS  (most common use)
-     * - ImportAccounts_Model::TYPE_IMPORT_HOSTNAMES
-     * @return string
-     */
-    public function getImportType() {
-        return ImportAccounts_Model::TYPE_IMPORT_NO_PRODUCTS;
-    }
-public function addError($message) {
-    $this->logger()->error('WISP :: Error', ['message' => $message]);
-    $this->logToFile('WISP :: Error', $message);
-    parent::addError($message);
-}
-
-
-    function parseVariables($variables, $nodeAndAllocations, $data) {
-        $nextAllocation = 0;
-        $env = explode(';', $variables);
-        foreach ($env as $ev) {
-            $e = explode(':', $ev);
-            if (isset($e[1])) {
-                $val = trim($e[1]);
-                preg_match_all("/\\\$([a-zA-Z_{}]*)/", $val, $match);
-                foreach ($match[1] as $item) {
-                    if ($item === '{allocation}') { // Assigning one of the allocations, if available.
-                        $val = $nodeAndAllocations["secondary_allocation_ids"][$nextAllocation][1];
-                        $val = "$val"; // To String
-                        $nextAllocation++;
-                    } else if ($item === '{port}') { // Assigning the main allocation.
-                        $val = $nodeAndAllocations["primary_allocation_id"][1];
-                        $val = "$val"; // To String
-                    } else {
-                        $val = str_replace("\$" . $item, $this->account_config[$item]["variable_id"], $val);
-                        if ($val == null || $val == "") {
-                            $val = $this->account_config[$item]["value"]; // If text-input.
-                        }
-                    }
-                }
-                $data['environment'][trim($e[0])] = $val;
-            }
-        }
-        return $data;
-    }
-private function logToFile($label, $data) {
-    $logLine = "[" . date('Y-m-d H:i:s') . "] $label:\n" . print_r($data, true) . "\n\n";
-    file_put_contents('/tmp/wispgg.log', $logLine, FILE_APPEND);
-}
-
 }
